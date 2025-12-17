@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import requests
 import os
-import matplotlib.pyplot as plt
 
 # --------------------------------
 # Page Config
@@ -16,16 +15,15 @@ st.set_page_config(
 st.title("🌦️ Bengaluru Weather Dashboard (2014–2024)")
 
 # --------------------------------
-# File Name
+# CSV File
 # --------------------------------
 CSV_FILE = "Bengaluru_Weather_2014_2024.csv"
 
 # --------------------------------
-# Fetch Weather Data (Open-Meteo - SAFE METHOD)
+# Fetch Weather Data (Open-Meteo)
 # --------------------------------
 @st.cache_data
 def fetch_weather_data():
-
     url = (
         "https://archive-api.open-meteo.com/v1/archive"
         "?latitude=12.9716"
@@ -134,48 +132,41 @@ st.metric("Rainy Days", rainy_days)
 st.metric("Rain Intensity", rain_intensity)
 
 # --------------------------------
-# 📈 Temperature Trend Graph
+# 🌡️ Temperature Trend (Line Chart)
 # --------------------------------
 st.subheader("🌡️ Daily Temperature Trend")
 
-fig, ax = plt.subplots()
-ax.plot(filtered["date"], filtered["temp_max"], label="Max Temp")
-ax.plot(filtered["date"], filtered["temp_mean"], label="Mean Temp")
-ax.plot(filtered["date"], filtered["temp_min"], label="Min Temp")
-ax.set_xlabel("Date")
-ax.set_ylabel("Temperature (°C)")
-ax.legend()
-ax.grid(True)
-st.pyplot(fig)
+temp_df = filtered.set_index("date")[[
+    "temp_max", "temp_mean", "temp_min"
+]]
+st.line_chart(temp_df)
 
 # --------------------------------
-# 🌧️ Daily Rainfall Graph
+# 🌧️ Daily Rainfall (Bar Chart)
 # --------------------------------
 st.subheader("🌧️ Daily Rainfall")
 
-fig, ax = plt.subplots()
-ax.bar(filtered["date"], filtered["rain"])
-ax.set_xlabel("Date")
-ax.set_ylabel("Rainfall (mm)")
-ax.grid(True)
-st.pyplot(fig)
+rain_df = filtered.set_index("date")[["rain"]]
+st.bar_chart(rain_df)
 
 # --------------------------------
-# 📊 Rainy vs Dry Days Graph
+# 📊 Rainy vs Dry Days
 # --------------------------------
 st.subheader("📊 Rainy vs Dry Days")
 
-rainy = (filtered["rain"] > 0).sum()
-dry = (filtered["rain"] == 0).sum()
+summary_df = pd.DataFrame({
+    "Days": ["Rainy Days", "Dry Days"],
+    "Count": [
+        (filtered["rain"] > 0).sum(),
+        (filtered["rain"] == 0).sum()
+    ]
+}).set_index("Days")
 
-fig, ax = plt.subplots()
-ax.bar(["Rainy Days", "Dry Days"], [rainy, dry])
-ax.set_ylabel("Number of Days")
-ax.grid(axis="y")
-st.pyplot(fig)
+st.bar_chart(summary_df)
 
 # --------------------------------
 # 📅 Data Table
 # --------------------------------
 with st.expander("📅 Show Daily Weather Data"):
     st.dataframe(filtered)
+
