@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
-import openmeteo_requests
-import requests_cache
-from retry_requests import retry
+import requests
 import os
 import matplotlib.pyplot as plt
 
@@ -23,52 +21,39 @@ st.title("🌦️ Bengaluru Weather Dashboard (2014–2024)")
 CSV_FILE = "Bengaluru_Weather_2014_2024.csv"
 
 # --------------------------------
-# Fetch Weather Data (Open-Meteo)
+# Fetch Weather Data (Open-Meteo - SAFE METHOD)
 # --------------------------------
 @st.cache_data
 def fetch_weather_data():
-    cache_session = requests_cache.CachedSession(".cache", expire_after=-1)
-    retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
-    openmeteo = openmeteo_requests.Client(session=retry_session)
 
-    url = "https://archive-api.open-meteo.com/v1/archive"
+    url = (
+        "https://archive-api.open-meteo.com/v1/archive"
+        "?latitude=12.9716"
+        "&longitude=77.5946"
+        "&start_date=2014-01-01"
+        "&end_date=2024-12-31"
+        "&daily=temperature_2m_max"
+        ",temperature_2m_min"
+        ",temperature_2m_mean"
+        ",precipitation_sum"
+        ",rain_sum"
+        ",wind_speed_10m_max"
+        "&timezone=Asia/Kolkata"
+    )
 
-    params = {
-        "latitude": 12.9716,
-        "longitude": 77.5937,
-        "start_date": "2014-01-01",
-        "end_date": "2024-12-31",
-        "daily": [
-            "temperature_2m_max",
-            "temperature_2m_min",
-            "temperature_2m_mean",
-            "precipitation_sum",
-            "rain_sum",
-            "wind_speed_10m_max"
-        ],
-        "timezone": "Asia/Kolkata"
-    }
+    response = requests.get(url, timeout=30)
+    data = response.json()
 
-    responses = openmeteo.weather_api(url, params=params)
-    response = responses[0]
-    daily = response.Daily()
+    df = pd.DataFrame({
+        "date": pd.to_datetime(data["daily"]["time"]),
+        "temp_max": data["daily"]["temperature_2m_max"],
+        "temp_min": data["daily"]["temperature_2m_min"],
+        "temp_mean": data["daily"]["temperature_2m_mean"],
+        "precipitation": data["daily"]["precipitation_sum"],
+        "rain": data["daily"]["rain_sum"],
+        "wind_speed_max": data["daily"]["wind_speed_10m_max"]
+    })
 
-    data = {
-        "date": pd.date_range(
-            start=pd.to_datetime(daily.Time(), unit="s"),
-            end=pd.to_datetime(daily.TimeEnd(), unit="s"),
-            freq="D",
-            inclusive="left"
-        ),
-        "temp_max": daily.Variables(0).ValuesAsNumpy(),
-        "temp_min": daily.Variables(1).ValuesAsNumpy(),
-        "temp_mean": daily.Variables(2).ValuesAsNumpy(),
-        "precipitation": daily.Variables(3).ValuesAsNumpy(),
-        "rain": daily.Variables(4).ValuesAsNumpy(),
-        "wind_speed_max": daily.Variables(5).ValuesAsNumpy()
-    }
-
-    df = pd.DataFrame(data)
     df.to_csv(CSV_FILE, index=False)
     return df
 
@@ -190,7 +175,7 @@ ax.grid(axis="y")
 st.pyplot(fig)
 
 # --------------------------------
-# Optional Data Table
+# 📅 Data Table
 # --------------------------------
 with st.expander("📅 Show Daily Weather Data"):
     st.dataframe(filtered)
